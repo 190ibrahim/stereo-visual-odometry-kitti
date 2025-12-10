@@ -1,0 +1,34 @@
+# Build outputs
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Binaries and objects
+*.o
+*.so
+*.a
+*.out
+*.exe
+
+# IDE and editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python virtualenv and cache
+.venv/
+__pycache__/
+*.pyc
+
+# Dataset (large files)
+dataset/sequences/
+!dataset/sequences/.gitkeep
+dataset/results/
+!dataset/results/.gitkeep
+
+# Logs
+*.log
