@@ -5,6 +5,7 @@ project(stereo_visual_odometry)
 #add_compile_options(-std=c++14)
 
 find_package(OpenCV REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 ###########
 ## Build ##
@@ -13,12 +14,13 @@ find_package(OpenCV REQUIRED)
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(${OpenCV_INCLUDE_DIRS})
+include_directories(${YAML_CPP_INCLUDE_DIR})
 
 add_executable(${PROJECT_NAME}
         src/tdv_lab.cpp
 )
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS})
+target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} yaml-cpp)
 
 

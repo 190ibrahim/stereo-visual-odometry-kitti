@@ -1,0 +1,8 @@
+dataset:
+  root: "../dataset"
+  sequence: "00"
+
+vo:
+  detector_type:
+
+visualization:

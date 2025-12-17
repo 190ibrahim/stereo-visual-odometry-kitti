@@ -27,8 +27,8 @@ __pycache__/
 # Dataset (large files)
 dataset/sequences/
 !dataset/sequences/.gitkeep
-dataset/results/
-!dataset/results/.gitkeep
+data_odometry_gray.zip
+
 
 # Logs
 *.log

@@ -18,20 +18,29 @@ pip install evo numpy matplotlib
 ```
 
 ## Dataset (KITTI)
-1) Download a sequence from http://www.cvlibs.net/datasets/kitti/eval_odometry.php
+1) From the KITTI website http://www.cvlibs.net/datasets/kitti/eval_odometry.php , download:
+
+* **Odometry dataset (grayscale images)**
+* **Odometry ground truth poses**
+
 2) Place files as:
+
 ```
-dataset/sequences/04/
-  image_0/  # left
-  image_1/  # right
-  calib.txt
+dataset/
+├── sequences/00/
+│   ├── image_0/    # left grayscale images
+│   ├── image_1/    # right grayscale images
+│   ├── calib.txt   # stereo calibration
+│   └── times.txt   
+└── poses/
+    └── 00.txt       # ground truth poses
 ```
 
 ## Build
 ```bash
 mkdir -p build && cd build
 cmake ..
-make -j
+make 
 ```
 
 ## Run

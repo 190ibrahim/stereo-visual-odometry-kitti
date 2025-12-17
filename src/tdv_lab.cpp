@@ -8,6 +8,8 @@
 #include <opencv2/video/video.hpp>
 
 #include <iostream>
+#include <fstream>
+#include <yaml-cpp/yaml.h>
 
 using namespace std;
 using namespace cv;
@@ -23,42 +25,40 @@ void savePoseKITTI(FILE *pFile, Mat Pose) {
 
 
 int main(int argc, char** argv){
+  // Load config.yaml
+  std::string config_path = "../config.yaml";
+  YAML::Node config = YAML::LoadFile(config_path);
+  std::string dataset_root = config["dataset"]["root"].as<std::string>();
+  std::string sequence_str = config["dataset"]["sequence"].as<std::string>();
+  int sequence = std::stoi(sequence_str);
 
-    Mat P0,P1;  //projection matrices for left and right camera
+  Mat P0,P1;  //projection matrices for left and right camera
 
-  int sequence=9; //select KITTI sequence
+  // Build calib.txt path
+  std::string calib_path = dataset_root + "/sequences/" + sequence_str + "/calib.txt";
+  std::ifstream calib_file(calib_path);
+  std::vector<std::vector<double>> proj(2, std::vector<double>(12, 0.0));
+  if (calib_file.is_open()) {
+    std::string line;
+    int idx = 0;
+    while (std::getline(calib_file, line) && idx < 2) {
+      size_t pos = line.find(":");
+      if (pos != std::string::npos) {
+        std::istringstream iss(line.substr(pos + 1));
+        for (int i = 0; i < 12; ++i) {
+          iss >> proj[idx][i];
+        }
+      }
+      idx++;
+    }
+    calib_file.close();
+    P0 = cv::Mat(3, 4, CV_64F, proj[0].data()).clone();
+    P1 = cv::Mat(3, 4, CV_64F, proj[1].data()).clone();
+  } else {
+    std::cerr << "Could not open calib.txt at " << calib_path << std::endl;
+    return -1;
+  }
 
-  //use data from KITTI calib.txt file in sequences to set projection matrices (images are rectified!)
-  if (sequence<3) {
-    double p0[12] = {7.188560000000e+02, 0.000000000000e+00, 6.071928000000e+02, 0.000000000000e+00,
-                     0.000000000000e+00, 7.188560000000e+02, 1.852157000000e+02, 0.000000000000e+00,
-                     0.000000000000e+00, 0.000000000000e+00, 1.000000000000e+00, 0.000000000000e+00};
-    double p1[12] = {7.188560000000e+02, 0.000000000000e+00, 6.071928000000e+02, -3.861448000000e+02,
-                     0.000000000000e+00, 7.188560000000e+02, 1.852157000000e+02, 0.000000000000e+00,
-                     0.000000000000e+00, 0.000000000000e+00, 1.000000000000e+00, 0.000000000000e+00};
-    P0 = cv::Mat(3, 4, CV_64F, p0);
-    P1 = cv::Mat(3, 4, CV_64F, p1);
-  }
-  if (sequence==3) {
-    double p0[12] = {7.215377000000e+02, 0.000000000000e+00, 6.095593000000e+02, 0.000000000000e+00,
-                     0.000000000000e+00, 7.215377000000e+02, 1.728540000000e+02, 0.000000000000e+00,
-                     0.000000000000e+00, 0.000000000000e+00, 1.000000000000e+00, 0.000000000000e+00};
-    double p1[12] = {7.215377000000e+02, 0.000000000000e+00, 6.095593000000e+02, -3.875744000000e+02,
-                     0.000000000000e+00, 7.215377000000e+02, 1.728540000000e+02, 0.000000000000e+00,
-                     0.000000000000e+00, 0.000000000000e+00, 1.000000000000e+00, 0.000000000000e+00};
-    P0 = cv::Mat(3, 4, CV_64F, p0);
-    P1 = cv::Mat(3, 4, CV_64F, p1);
-  }
-  if (sequence>3) {
-    double p0[12] = {7.070912000000e+02, 0.000000000000e+00, 6.018873000000e+02, 0.000000000000e+00,
-                     0.000000000000e+00, 7.070912000000e+02, 1.831104000000e+02, 0.000000000000e+00,
-                     0.000000000000e+00, 0.000000000000e+00, 1.000000000000e+00, 0.000000000000e+00};
-    double p1[12] = {7.070912000000e+02, 0.000000000000e+00, 6.018873000000e+02, -3.798145000000e+02,
-                     0.000000000000e+00, 7.070912000000e+02, 1.831104000000e+02, 0.000000000000e+00,
-                     0.000000000000e+00, 0.000000000000e+00, 1.000000000000e+00, 0.000000000000e+00};
-    P0 = cv::Mat(3, 4, CV_64F, p0);
-    P1 = cv::Mat(3, 4, CV_64F, p1);
-  }
   //camera matrix is the same for left and right camera
   Mat cameraMatrix = P0(cv::Rect(0,0,3,3)).clone();
 
@@ -74,46 +74,48 @@ int main(int argc, char** argv){
   cout<<"baseline: "<<base<<endl;
 
 
-  int name_counter=0;
-  char name[1024];
 
-  Mat image0,image1;
-  Mat image0_prev, image1_prev;
-  Mat color0;
+    int name_counter=0;
+    char name[1024];
 
-  //Current camera pose
-  Mat Pose=Mat::eye(4,4,CV_64F);
+    Mat image0,image1;
+    Mat image0_prev, image1_prev;
+    Mat color0;
 
-  Scalar red(0,0,255);
-  Scalar green(0,255,0);
-  Scalar blue(255,0,0);
+    //Current camera pose
+    Mat Pose=Mat::eye(4,4,CV_64F);
 
-  bool pause=false;
+    Scalar red(0,0,255);
+    Scalar green(0,255,0);
+    Scalar blue(255,0,0);
 
-  //open file for writing the results
-  FILE *pResults = NULL;
-  char filename[1024];
-  sprintf(filename, "../dataset/results/%.2d.txt",sequence);
-  pResults = fopen (filename,"w");
+    bool pause=false;
+
+    //open file for writing the results
+    FILE *pResults = NULL;
+    char filename[1024];
+    snprintf(filename, 1024, "%s/results/%s.txt", dataset_root.c_str(), sequence_str.c_str());
+    pResults = fopen (filename,"w");
 
   while (true) {
 
     //LOAD IMAGES
 
-    //load left image
-    sprintf(name, "../dataset/sequences/%.2d/image_0/%.6d.png",sequence,name_counter);
-    image0 = cv::imread(name,cv::IMREAD_GRAYSCALE);
-    if (image0.data==NULL ) {
-      std::cout<<"could not read "<<name<<std::endl;
-      break;
-    }
-    //load right image
-    sprintf(name, "../dataset/sequences/%.2d/image_1/%.6d.png",sequence,name_counter);
-    image1 = cv::imread(name,cv::IMREAD_GRAYSCALE);
-    if (image1.data==NULL ) {
-      std::cout<<"could not read "<<name<<std::endl;
-      break;
-    }
+
+        //load left image
+        snprintf(name, 1024, "%s/sequences/%s/image_0/%06d.png", dataset_root.c_str(), sequence_str.c_str(), name_counter);
+        image0 = cv::imread(name,cv::IMREAD_GRAYSCALE);
+        if (image0.data==NULL ) {
+            std::cout<<"could not read "<<name<<std::endl;
+            break;
+        }
+        //load right image
+        snprintf(name, 1024, "%s/sequences/%s/image_1/%06d.png", dataset_root.c_str(), sequence_str.c_str(), name_counter);
+        image1 = cv::imread(name,cv::IMREAD_GRAYSCALE);
+        if (image1.data==NULL ) {
+            std::cout<<"could not read "<<name<<std::endl;
+            break;
+        }
 
     if (name_counter==0) {
       //THE FIRST IMAGE, SAVE IDENTITY POSE AND CONTINUE
@@ -209,12 +211,12 @@ int main(int argc, char** argv){
     image1_prev=image1;
 
     name_counter++;
-  }
+    }
 
-  if (pResults) {
-    fclose (pResults);
-    cout<<"results written to "<<filename<<endl;
-  }
+    if (pResults) {
+        fclose (pResults);
+        cout<<"results written to "<<filename<<endl;
+    }
 
-  return 0;
+    return 0;
 }
