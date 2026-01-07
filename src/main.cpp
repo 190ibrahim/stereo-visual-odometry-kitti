@@ -11,6 +11,9 @@
 #include <fstream>
 #include <yaml-cpp/yaml.h>
 
+#include "feature_detector.h"
+
+
 using namespace std;
 using namespace cv;
 
@@ -30,7 +33,10 @@ int main(int argc, char** argv){
   YAML::Node config = YAML::LoadFile(config_path);
   std::string dataset_root = config["dataset"]["root"].as<std::string>();
   std::string sequence_str = config["dataset"]["sequence"].as<std::string>();
+  std::string detector_type = config["vo"]["detector_type"].as<std::string>();
+  int n_features = config["vo"]["n_features"].as<int>();
   int sequence = std::stoi(sequence_str);
+
 
   Mat P0,P1;  //projection matrices for left and right camera
 
@@ -43,6 +49,7 @@ int main(int argc, char** argv){
     int idx = 0;
     while (std::getline(calib_file, line) && idx < 2) {
       size_t pos = line.find(":");
+  
       if (pos != std::string::npos) {
         std::istringstream iss(line.substr(pos + 1));
         for (int i = 0; i < 12; ++i) {
@@ -126,21 +133,31 @@ int main(int argc, char** argv){
       continue;
     }
 
-    //DETECT FEATURES IN CURRENT LEFT IMAGE
+    // 1. Detect features in current and previous left images
+    std::vector<cv::KeyPoint> keypoints, keypoints_prev;
+    cv::Mat descriptors, descriptors_prev;
+    detectFeatures(image0, keypoints, descriptors, detector_type, n_features);
+    detectFeatures(image0_prev, keypoints_prev, descriptors_prev, detector_type, n_features);
 
-    //FIND MATCHES TO PREVIOUS LEFT
+    // 2. Match features between previous and current left images (temporal matching)
+    std::vector<cv::DMatch> matches;
+    matchFeatures(descriptors_prev, descriptors, matches);
 
-    //FIND MATCHES TO CURRENT RIGHT
+
+    // 3. Detect features in current right image (for stereo matching)
+    std::vector<cv::KeyPoint> keypoints_right;
+    cv::Mat descriptors_right;
+    detectFeatures(image1, keypoints_right, descriptors_right, detector_type, n_features);
+
+    // 4. Match features between current left and right images (stereo matching)
+    std::vector<cv::DMatch> stereo_matches;
+    matchFeatures(descriptors, descriptors_right, stereo_matches);
+
 
     //FILTER GOOD MATCHES - LESS PROBLEMS IN THE OPTIMIZATION PART
-    vector<Point2f> matches0,matches1,matches0_prev,matches1_prev;
+    vector<Point2f> matches0, matches1, matches0_prev, matches1_prev;
     vector<Point2f> fails;
-
-      //CHECK CURRENT LEFT-RIGHT EPIPOLAR CONSTRAINT
-
-      //CHECK IF DISPARITY IS POSITIVE
-
-      //SELECT GOOD MATCHES FROM CORRECT EPIPOLAR AND DISPARITY
+    filterStereoMatches(stereo_matches, keypoints, keypoints_right, matches0, matches1, fails);
 
     //PROJECT CURRENT MATCHES TO 3D 
     

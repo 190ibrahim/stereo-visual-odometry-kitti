@@ -15,10 +15,14 @@ find_package(yaml-cpp REQUIRED)
 ## Your package locations should be listed before other locations
 include_directories(${OpenCV_INCLUDE_DIRS})
 include_directories(${YAML_CPP_INCLUDE_DIR})
+include_directories(${CMAKE_SOURCE_DIR}/include)
 
 add_executable(${PROJECT_NAME}
-        src/tdv_lab.cpp
-)
+    src/main.cpp
+    src/feature_detector.cpp
+    src/pose_estimator.cpp
+    src/utils.cpp
+    )
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS} yaml-cpp)

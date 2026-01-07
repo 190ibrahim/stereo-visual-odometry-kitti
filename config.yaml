@@ -3,6 +3,7 @@ dataset:
   sequence: "00"
 
 vo:
-  detector_type:
+  detector_type: "ORB"   # or "SIFT"
+  n_features: 1000       # number of features to detect
 
 visualization:
