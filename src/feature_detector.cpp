@@ -1,47 +1,68 @@
 #include "feature_detector.h"
+#include <iostream>
+#include <opencv2/xfeatures2d.hpp>  // For SIFT
 
-void detectFeatures(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints, cv::Mat& descriptors,
-                    const std::string& detector_type, int n_features) {
-    cv::Ptr<cv::Feature2D> detector;
-    if (detector_type == "ORB") {
-        detector = cv::ORB::create(n_features);
-    } 
-    // else if (detector_type == "SIFT") {
-    //     detector = cv::SIFT::create(n_features);
-    // } 
-    else {
-        throw std::runtime_error("Unknown detector type: " + detector_type);
+StereoFeatureDetector::StereoFeatureDetector(const std::string& detector_type) 
+    : detector_type_(detector_type) {
+    
+    if (detector_type_ == "ORB") {
+        detector_ = cv::ORB::create();  // Default ~500 features
+        matcher_ = cv::BFMatcher::create(cv::NORM_HAMMING, false);  // crossCheck=false for knnMatch
+        std::cout << "Using ORB detector with default features" << std::endl;
+    } else if (detector_type_ == "SIFT") {
+        try {
+            detector_ = cv::xfeatures2d::SIFT::create(); // Default unlimited features
+            matcher_ = cv::BFMatcher::create(cv::NORM_L2, false);  // crossCheck=false for knnMatch
+            std::cout << "Using SIFT detector with default features" << std::endl;
+        } catch (const cv::Exception& e) {
+            std::cerr << "SIFT not available (need opencv_contrib). Using ORB instead." << std::endl;
+            detector_ = cv::ORB::create();
+            matcher_ = cv::BFMatcher::create(cv::NORM_HAMMING, false);
+            detector_type_ = "ORB";
+        }
+    } else {
+        std::cerr << "Unknown detector type: " << detector_type_ << ". Using ORB." << std::endl;
+        detector_ = cv::ORB::create();
+        matcher_ = cv::BFMatcher::create(cv::NORM_HAMMING, false);
+        detector_type_ = "ORB";
     }
-    detector->detectAndCompute(image, cv::noArray(), keypoints, descriptors);
 }
 
-void matchFeatures(const cv::Mat& descriptors1, const cv::Mat& descriptors2, std::vector<cv::DMatch>& matches) {
-    cv::BFMatcher matcher(cv::NORM_HAMMING, true);
-    matcher.match(descriptors1, descriptors2, matches);
+void StereoFeatureDetector::detectFeatures(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints, cv::Mat& descriptors) {
+    if (image.empty()) {
+        std::cerr << "Empty image passed to detectFeatures" << std::endl;
+        return;
+    }
+    
+    detector_->detectAndCompute(image, cv::noArray(), keypoints, descriptors);
+    std::cout << "Detected " << keypoints.size() << " keypoints" << std::endl;
 }
 
-
-void filterStereoMatches(
-    const std::vector<cv::DMatch>& stereo_matches,
-    const std::vector<cv::KeyPoint>& keypoints_left,
-    const std::vector<cv::KeyPoint>& keypoints_right,
-    std::vector<cv::Point2f>& matches0,
-    std::vector<cv::Point2f>& matches1,
-    std::vector<cv::Point2f>& fails)
-{
-    for (const auto& m : stereo_matches) {
-        cv::Point2f pt_left = keypoints_left[m.queryIdx].pt;
-        cv::Point2f pt_right = keypoints_right[m.trainIdx].pt;
-        float epipolar_diff = std::abs(pt_left.y - pt_right.y);
-        float disparity = pt_left.x - pt_right.x;
-        if (epipolar_diff < 1.0 && disparity > 0) {
-            matches0.push_back(pt_left);
-            matches1.push_back(pt_right);
-        } else {
-            fails.push_back(pt_left);
+void StereoFeatureDetector::matchFeatures(const cv::Mat& desc1, const cv::Mat& desc2, std::vector<cv::DMatch>& matches) {
+    if (desc1.empty() || desc2.empty()) {
+        std::cerr << "Empty descriptors passed to matchFeatures" << std::endl;
+        return;
+    }
+    
+    // Use knnMatch with k=2 like Python code
+    std::vector<std::vector<cv::DMatch>> knn_matches;
+    matcher_->knnMatch(desc1, desc2, knn_matches, 2);
+    
+    // Apply Lowe's ratio test (like Python: distance_threshold = 0.35 from config)
+    const float distance_threshold = 0.35f; // From your config.yaml
+    matches.clear();
+    
+    for (const auto& match_pair : knn_matches) {
+        if (match_pair.size() == 2) {
+            const cv::DMatch& match1 = match_pair[0]; // Best match
+            const cv::DMatch& match2 = match_pair[1]; // Second best match
+            
+            // Lowe's ratio test: match1.distance <= distance_threshold * match2.distance
+            if (match1.distance <= distance_threshold * match2.distance) {
+                matches.push_back(match1);
+            }
         }
     }
-    std::cout << "Stereo matches: " << stereo_matches.size() << std::endl;
-    std::cout << "Good matches: " << matches0.size() << std::endl;
-    std::cout << "Rejected matches: " << fails.size() << std::endl;
+    
+    std::cout << "Found " << knn_matches.size() << " raw matches, filtered to " << matches.size() << " good matches" << std::endl;
 }

@@ -4,7 +4,8 @@ project(stereo_visual_odometry)
 ## Compile as C++11
 #add_compile_options(-std=c++14)
 
-find_package(OpenCV REQUIRED)
+set(OpenCV_DIR "/usr/local/lib/cmake/opencv4")
+find_package(OpenCV REQUIRED COMPONENTS core imgproc highgui features2d xfeatures2d calib3d)
 find_package(yaml-cpp REQUIRED)
 
 ###########
@@ -21,7 +22,6 @@ add_executable(${PROJECT_NAME}
     src/main.cpp
     src/feature_detector.cpp
     src/pose_estimator.cpp
-    src/utils.cpp
     )
 
 ## Specify libraries to link a library or executable target against

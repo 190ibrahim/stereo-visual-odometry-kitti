@@ -12,6 +12,7 @@
 #include <yaml-cpp/yaml.h>
 
 #include "feature_detector.h"
+#include "pose_estimator.h"
 
 
 using namespace std;
@@ -33,8 +34,7 @@ int main(int argc, char** argv){
   YAML::Node config = YAML::LoadFile(config_path);
   std::string dataset_root = config["dataset"]["root"].as<std::string>();
   std::string sequence_str = config["dataset"]["sequence"].as<std::string>();
-  std::string detector_type = config["vo"]["detector_type"].as<std::string>();
-  int n_features = config["vo"]["n_features"].as<int>();
+  std::string detector_type = config["vo"]["detector"].as<std::string>();
   int sequence = std::stoi(sequence_str);
 
 
@@ -80,6 +80,21 @@ int main(int argc, char** argv){
   cout<<"principal point cv: "<<cv<<endl;
   cout<<"baseline: "<<base<<endl;
 
+  // Initialize feature detector
+  StereoFeatureDetector feature_detector(detector_type);
+  
+  // Initialize stereo depth computation (like Python stereo_depth)
+  StereoDepth stereo_depth(P0, P1);
+  
+  // Initialize motion estimator (like Python motion_estimation)
+  MotionEstimator motion_estimator(cameraMatrix, 3000.0); // max_depth from config
+  
+  // Initialize ground truth loader (like Python DataLoader)
+  GroundTruthLoader gt_loader(dataset_root, sequence_str);
+  if (!gt_loader.loadGroundTruth()) {
+    std::cerr << "Warning: Could not load ground truth for evaluation" << std::endl;
+  }
+
 
 
     int name_counter=0;
@@ -88,6 +103,10 @@ int main(int argc, char** argv){
     Mat image0,image1;
     Mat image0_prev, image1_prev;
     Mat color0;
+    
+    // Store previous frame keypoints and descriptors for matching
+    std::vector<cv::KeyPoint> keypoints_prev;
+    cv::Mat descriptors_prev;
 
     //Current camera pose
     Mat Pose=Mat::eye(4,4,CV_64F);
@@ -100,9 +119,18 @@ int main(int argc, char** argv){
 
     //open file for writing the results
     FILE *pResults = NULL;
+    FILE *pEvaluation = NULL;
     char filename[1024];
-    snprintf(filename, 1024, "%s/results/%s.txt", dataset_root.c_str(), sequence_str.c_str());
+    char eval_filename[1024];
+    snprintf(filename, 1024, "../results/%s.txt", sequence_str.c_str());
+    snprintf(eval_filename, 1024, "../results/%s_evaluation.txt", sequence_str.c_str());
     pResults = fopen (filename,"w");
+    pEvaluation = fopen(eval_filename, "w");
+    
+    // Write evaluation file header
+    if (pEvaluation) {
+        fprintf(pEvaluation, "frame,gt_x,gt_y,gt_z,est_x,est_y,est_z,trans_error,rot_error\n");
+    }
 
   while (true) {
 
@@ -129,57 +157,84 @@ int main(int argc, char** argv){
       savePoseKITTI(pResults,Pose);
       image0_prev=image0;
       image1_prev=image1;
+      
+      // Detect features in first frame for next iteration
+      feature_detector.detectFeatures(image0, keypoints_prev, descriptors_prev);
+      
       name_counter++;
       continue;
     }
+    //DETECT FEATURES IN CURRENT LEFT IMAGE
+    std::vector<cv::KeyPoint> keypoints_current;
+    cv::Mat descriptors_current;
+    feature_detector.detectFeatures(image0, keypoints_current, descriptors_current);
 
-    // 1. Detect features in current and previous left images
-    std::vector<cv::KeyPoint> keypoints, keypoints_prev;
-    cv::Mat descriptors, descriptors_prev;
-    detectFeatures(image0, keypoints, descriptors, detector_type, n_features);
-    detectFeatures(image0_prev, keypoints_prev, descriptors_prev, detector_type, n_features);
-
-    // 2. Match features between previous and current left images (temporal matching)
+    //FIND MATCHES TO PREVIOUS LEFT
     std::vector<cv::DMatch> matches;
-    matchFeatures(descriptors_prev, descriptors, matches);
+    if (!descriptors_prev.empty() && !descriptors_current.empty()) {
+        feature_detector.matchFeatures(descriptors_prev, descriptors_current, matches);
+    }
 
-
-    // 3. Detect features in current right image (for stereo matching)
-    std::vector<cv::KeyPoint> keypoints_right;
-    cv::Mat descriptors_right;
-    detectFeatures(image1, keypoints_right, descriptors_right, detector_type, n_features);
-
-    // 4. Match features between current left and right images (stereo matching)
-    std::vector<cv::DMatch> stereo_matches;
-    matchFeatures(descriptors, descriptors_right, stereo_matches);
-
+    //COMPUTE STEREO DEPTH (like Python stereo_depth function)
+    cv::Mat depth_map = stereo_depth.computeDepth(image0, image1);
+    std::cout << "Computed depth map: " << depth_map.size() << std::endl;
+    
+    //MOTION ESTIMATION USING PnP (like Python motion_estimation)
+    cv::Mat R_est, t_est;
+    bool motion_success = motion_estimator.estimateMotion(matches, keypoints_prev, keypoints_current, 
+                                                         depth_map, R_est, t_est);
+    
+    if (motion_success) {
+        // Create transformation matrix (like Python)
+        cv::Mat T_est = cv::Mat::eye(4, 4, CV_64F);
+        R_est.copyTo(T_est(cv::Rect(0, 0, 3, 3)));
+        t_est.copyTo(T_est(cv::Rect(3, 0, 1, 3)));
+        
+        // Update pose (like Python: homo_matrix = homo_matrix.dot(np.linalg.inv(Transformation_matrix)))
+        Pose = Pose * T_est.inv();
+    } else {
+        std::cout << "Motion estimation failed, using identity transform" << std::endl;
+    }
+    
+    // Progress reporting (like Python)
+    if (name_counter % 10 == 0) {
+        std::cout << "\n=== " << name_counter << " frames have been computed ===" << std::endl;
+    }
+    
+    // Ground truth comparison (like Python visualization)
+    if (gt_loader.getNumFrames() > name_counter) {
+        gt_loader.printTrajectoryComparison(Pose, name_counter);
+        
+        // Save evaluation data to file
+        if (pEvaluation) {
+            cv::Point3f gt_pos = gt_loader.getGroundTruthPosition(name_counter);
+            cv::Point3f est_pos(Pose.at<double>(0, 3), Pose.at<double>(1, 3), Pose.at<double>(2, 3));
+            double trans_error = gt_loader.computeTranslationError(Pose, name_counter);
+            double rot_error = gt_loader.computeRotationError(Pose, name_counter);
+            
+            fprintf(pEvaluation, "%d,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f\n",
+                    name_counter, gt_pos.x, gt_pos.y, gt_pos.z, 
+                    est_pos.x, est_pos.y, est_pos.z, trans_error, rot_error);
+        }
+    }
 
     //FILTER GOOD MATCHES - LESS PROBLEMS IN THE OPTIMIZATION PART
-    vector<Point2f> matches0, matches1, matches0_prev, matches1_prev;
+    vector<Point2f> matches0,matches1,matches0_prev,matches1_prev;
     vector<Point2f> fails;
-    filterStereoMatches(stereo_matches, keypoints, keypoints_right, matches0, matches1, fails);
+
+    // Convert matches to Point2f for visualization (optional)
+    for (const auto& match : matches) {
+        if (motion_success) {
+            matches0.push_back(keypoints_current[match.trainIdx].pt);
+            matches0_prev.push_back(keypoints_prev[match.queryIdx].pt);
+        }
+    }
 
     //PROJECT CURRENT MATCHES TO 3D 
     
-    vector<bool> inliers_green(matches0.size(),false);
+    vector<bool> inliers_green(matches0.size(), motion_success);
 
-    //PREPARE ROTATION MATRIX AND TRANSLATION VECTOR TO BE SET BY THE METHOD
-    Mat R=Mat::eye(3,3,CV_64F);
-    double tx=0;
-    double ty=0;
-    double tz=0;
-  
-    //MINIMIZE REPROJECTION ERROR OF 3D POINTS FROM THE CURRENT FRAME INTO 2D POINTS OF THE PREVIOUS FRAME USING PnP
-
-    //Construct SE3 matrix from rotation matrix and translation vector
-    Mat SE3=Mat::eye(4,4,CV_64F);
-    R.copyTo(SE3(Rect(0,0,3,3)));
-    SE3.at<double>(0,3)=tx;
-    SE3.at<double>(1,3)=ty;
-    SE3.at<double>(2,3)=tz;
-
-    //Concatenate last transform to get current pose
-    Pose*=SE3;
+    // Motion estimation already computed R and t, no need for manual computation
 
     //Save current pose to file in a KITTI format
     savePoseKITTI(pResults,Pose);
@@ -201,7 +256,7 @@ int main(int argc, char** argv){
       //cv::line(color0,matches0[i],matches1[i],blue);//draw disparity
 
       if (inliers_green[i]) {
-        cv::line(color0,matches0[i],matches0_prev[i],green,2);
+        cv::line(color0,matches0[i],matches0_prev[i],green,1);
       } else {
         cv::line(color0,matches0[i],matches0_prev[i],red);
       }
@@ -226,6 +281,10 @@ int main(int argc, char** argv){
 
     image0_prev=image0;
     image1_prev=image1;
+    
+    // Store current frame data for next iteration
+    keypoints_prev = keypoints_current;
+    descriptors_prev = descriptors_current.clone();
 
     name_counter++;
     }
@@ -233,6 +292,40 @@ int main(int argc, char** argv){
     if (pResults) {
         fclose (pResults);
         cout<<"results written to "<<filename<<endl;
+    }
+    
+    if (pEvaluation) {
+        fclose(pEvaluation);
+        cout<<"evaluation data written to "<<eval_filename<<endl;
+    }
+    
+    // Print final trajectory evaluation summary (like Python)
+    if (gt_loader.getNumFrames() > 0) {
+        std::cout << "\n=== FINAL TRAJECTORY EVALUATION ===" << std::endl;
+        std::cout << "Processed " << name_counter << " frames" << std::endl;
+        std::cout << "Ground truth available for " << gt_loader.getNumFrames() << " frames" << std::endl;
+        
+        // Compute average errors over last 50 frames
+        double avg_trans_error = 0.0;
+        double avg_rot_error = 0.0;
+        int eval_frames = std::min(50, std::min(name_counter, gt_loader.getNumFrames()));
+        
+        for (int i = name_counter - eval_frames; i < name_counter && i < gt_loader.getNumFrames(); i++) {
+            if (i >= 0) {
+                avg_trans_error += gt_loader.computeTranslationError(Pose, i);
+                avg_rot_error += gt_loader.computeRotationError(Pose, i);
+            }
+        }
+        
+        if (eval_frames > 0) {
+            avg_trans_error /= eval_frames;
+            avg_rot_error /= eval_frames;
+            
+            std::cout << "Average translation error (last " << eval_frames << " frames): " 
+                      << std::fixed << std::setprecision(3) << avg_trans_error << " m" << std::endl;
+            std::cout << "Average rotation error (last " << eval_frames << " frames): " 
+                      << std::setprecision(2) << avg_rot_error << " degrees" << std::endl;
+        }
     }
 
     return 0;

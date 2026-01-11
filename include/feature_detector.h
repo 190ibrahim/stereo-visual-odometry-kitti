@@ -1,17 +1,21 @@
-#pragma once
+#ifndef FEATURE_DETECTOR_H
+#define FEATURE_DETECTOR_H
+
 #include <opencv2/opencv.hpp>
+#include <opencv2/features2d.hpp>
 #include <string>
+#include <vector>
 
-void detectFeatures(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints, cv::Mat& descriptors,
-                    const std::string& detector_type, int n_features);
+class StereoFeatureDetector {
+public:
+    StereoFeatureDetector(const std::string& detector_type);
+    void detectFeatures(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints, cv::Mat& descriptors);
+    void matchFeatures(const cv::Mat& desc1, const cv::Mat& desc2, std::vector<cv::DMatch>& matches);
+    
+private:
+    cv::Ptr<cv::Feature2D> detector_;
+    cv::Ptr<cv::DescriptorMatcher> matcher_;
+    std::string detector_type_;
+};
 
-void matchFeatures(const cv::Mat& descriptors1, const cv::Mat& descriptors2, std::vector<cv::DMatch>& matches);
-
-// Filter stereo matches by epipolar constraint and positive disparity
-void filterStereoMatches(
-    const std::vector<cv::DMatch>& stereo_matches,
-    const std::vector<cv::KeyPoint>& keypoints_left,
-    const std::vector<cv::KeyPoint>& keypoints_right,
-    std::vector<cv::Point2f>& matches0,
-    std::vector<cv::Point2f>& matches1,
-    std::vector<cv::Point2f>& fails);
+#endif // FEATURE_DETECTOR_H

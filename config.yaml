@@ -3,7 +3,8 @@ dataset:
   sequence: "00"
 
 vo:
-  detector_type: "ORB"   # or "SIFT"
-  n_features: 1000       # number of features to detect
-
-visualization:
+  rgb: False
+  rectified: True
+  detector: 'SIFT'
+  distance_threshold: 0.35
+  max_depth: 3000
