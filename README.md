@@ -6,7 +6,7 @@ A Python implementation of stereo visual odometry for the KITTI odometry benchma
 ```bash
 git clone https://github.com/190ibrahim/stereo-visual-odometry-kitti.git
 cd stereo-visual-odometry-kitti
-
+git checkout python-stereo-vo
 # Install dependencies
 pip install opencv-python numpy matplotlib pyyaml
 ```
