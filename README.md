@@ -2,12 +2,6 @@
 
 stereo VO pipeline for KITTI odometry benchmark sequences.
 
-## Requirements
-- CMake, Make
-- OpenCV (>=4.x)
-- C++11 toolchain
-- Python3 + evo (for evaluation)
-
 ## Setup
 ```bash
 git clone https://github.com/190ibrahim/stereo-visual-odometry-kitti.git
