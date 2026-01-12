@@ -1,25 +1,14 @@
 dataset:
-  root: "../dataset"
   sequence: "00"
 
 vo:
-  rgb: False
-  rectified: True
   detector: 'sift'          # Feature detector type
-  distance_threshold: 0.35  # Lowe's ratio test threshold
-  max_depth: 3000           # Maximum depth for stereo matching
-  max_frames: null          # null for all frames, or specify number like 200
+  max_frames: 200           # Number of frames to process
   plot: true                # Enable/disable visualization
-  
-sgbm:
-  num_disparities: 96       # Disparity range (6*16 = 96)  
-  block_size: 7             # Block matching window size
-  uniqueness_ratio: 15      # Good uniqueness
-  prefilter_cap: 63
-  speckle_window_size: 100
-  speckle_range: 2
 
-ransac:
-  iterations: 1500          # Good RANSAC iterations
-  reprojection_error: 4.0   # Moderate strictness
-  confidence: 0.995         # High confidence
+visualization:
+  show_video_stream: true   # Show live video stream of left camera
+  show_matches: false        # Show feature matches between frames
+  show_depth_map: false      # Show depth maps during processing
+  show_disparity_map: false  # Show disparity maps during processing
+  update_interval: 100      # Show visualizations every N frames
