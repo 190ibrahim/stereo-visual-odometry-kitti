@@ -3,11 +3,11 @@ dataset:
 
 vo:
   detector: 'sift'          # Feature detector type
-  max_frames: 200           # Number of frames to process
+  max_frames: null           # Number of frames to process
   plot: true                # Enable/disable visualization
 
 visualization:
-  show_video_stream: true   # Show live video stream of left camera
+  show_video_stream: false   # Show live video stream of left camera
   show_matches: false        # Show feature matches between frames
   show_depth_map: false      # Show depth maps during processing
   show_disparity_map: false  # Show disparity maps during processing

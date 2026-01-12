@@ -8,16 +8,16 @@ class TrajectoryVisualizer:
         self.ax = None
         
     def setup_plot(self, title="Ground Truth vs Estimated Trajectory"):
-        """Initialize the 3D plot"""
+        """Initialize the 2D plot"""
         plt.ion()  # Turn on interactive mode
         
         self.fig = plt.figure(figsize=(7, 5))
-        self.ax = self.fig.add_subplot(projection='3d')
-        self.ax.view_init(elev=-20, azim=270)
+        self.ax = self.fig.add_subplot(111)
         self.ax.set_xlabel('X (m)')
-        self.ax.set_ylabel('Y (m)')
-        self.ax.set_zlabel('Z (m)')
+        self.ax.set_ylabel('Z (m)')
         self.ax.set_title(title)
+        self.ax.grid(True)
+        self.ax.set_aspect('equal')
         
         # Plot ground truth
         self._plot_ground_truth()
@@ -28,9 +28,8 @@ class TrajectoryVisualizer:
     def _plot_ground_truth(self):
         """Plot the ground truth trajectory"""
         xs = self.ground_truth[:, 0, 3]
-        ys = self.ground_truth[:, 1, 3]
         zs = self.ground_truth[:, 2, 3]
-        self.ax.plot(xs, ys, zs, c='dimgray', linewidth=2, 
+        self.ax.plot(xs, zs, c='dimgray', linewidth=2, 
                     label=f'Ground Truth ({len(self.ground_truth)} frames)')
     
     def update_trajectory(self, trajectory, frame_idx=None):
@@ -39,10 +38,9 @@ class TrajectoryVisualizer:
             frame_idx = len(trajectory) - 1
             
         xs = trajectory[:frame_idx+1, 0, 3]
-        ys = trajectory[:frame_idx+1, 1, 3]
         zs = trajectory[:frame_idx+1, 2, 3]
         
-        self.ax.plot(xs, ys, zs, c='darkorange', linewidth=2, 
+        self.ax.plot(xs, zs, c='darkorange', linewidth=2, 
                    label='Estimated Trajectory' if frame_idx == 0 else '')
         if frame_idx == 0:
             self.ax.legend()
