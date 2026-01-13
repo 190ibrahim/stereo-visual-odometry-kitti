@@ -278,7 +278,7 @@ bottom line: the algorithm's core feature tracking works well. frame-to-frame mo
 <p align="center">
   <img src="results/trajectory_comparison-1.png" alt="2D Trajectory Plot" width="600">
 </p>
-<p align="center"><em>top-down view: estimated path (blue) vs ground truth (green)</em></p>
+<p align="center"><em>top-down view: estimated path (green) vs ground truth (blue)</em></p>
 
 **the big picture:** this shows where the car went from a bird's eye view. green is the true path (GPS ground truth), blue is our estimated path.
 
