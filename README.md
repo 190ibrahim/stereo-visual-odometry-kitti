@@ -146,7 +146,7 @@ rmse:    40.89 m
 std:     24.05 m
 ```
 <p align="center">
-  <img src="results/ape_plot-1.png" alt="APE Over Time" width="600">
+  <img src="results/ape_plot-1.png" alt="ATE Over Time" width="600">
 </p>
 <p align="center"><em>error timeline: gray line shows actual error at each frame, colored bands show statistics</em></p>
 
@@ -276,7 +276,7 @@ bottom line: the algorithm's core feature tracking works well. frame-to-frame mo
 #### Trajectory Comparison
 
 <p align="center">
-  <img src="results/ape_plot-1.png" alt="2D Trajectory Plot" width="600">
+  <img src="results/trajectory_comparison-1.png" alt="2D Trajectory Plot" width="600">
 </p>
 <p align="center"><em>top-down view: estimated path (blue) vs ground truth (green)</em></p>
 
@@ -303,7 +303,7 @@ return path (frames 3500-4500): blue path drifts slightly to the left of green. 
 total endpoint error: blue ends about 40m away from green. for a 3.7km journey with no GPS correction, that's actually not terrible - about 1% drift.
 
 <p align="center">
-  <img src="results/trajectory_comparison-3.png" alt="Position Over Time" width="700">
+  <img src="results/trajectory_comparison-2.png" alt="Position Over Time" width="700">
 </p>
 <p align="center"><em>x, y, z coordinates: frame-by-frame position comparison</em></p>
 
@@ -317,17 +317,10 @@ frames 1500-2500: the chaos zone. green makes rapid oscillations (rectangular tu
 
 frames 2500-end: offset established. blue and green run parallel but separated by 20-30m. we never close this gap.
 
-**y coordinate (vertical motion):**
-
-this should be boring - car on flat road. and it mostly is.
-
-frames 0-3500: both hovering near 0m. road is flat, algorithm tracks height well.
-
-frames 3500-4500: green drops to -40m, blue only drops to -20m. either going downhill or some calibration drift. y errors don't matter much for path tracking though.
 
 **z coordinate (forward motion):**
 
-this is the money plot. z is forward distance traveled.
+this is the importnant plot. z is forward distance traveled.
 
 frames 0-1500: beautiful synchronization. smooth curves matching perfectly. forward velocity estimation is accurate.
 
@@ -338,7 +331,7 @@ frames 2500-end: slight divergence. blue reaches 500m, green reaches 490m. we're
 **what this tells us:** z axis is most reliable (forward motion from disparity is accurate). x axis suffers during turns (directional confusion). y axis is least important (vertical drift doesn't affect trajectory much).
 
 <p align="center">
-  <img src="results/trajectory_comparison-2.png" alt="Orientation Over Time" width="700">
+  <img src="results/trajectory_comparison-3.png" alt="Orientation Over Time" width="700">
 </p>
 <p align="center"><em>roll, pitch, yaw angles: rotational component comparison</em></p>
 
@@ -388,7 +381,7 @@ frames 3500-end: both drop to around -150° but blue is offset above green. dire
 
 **comparing all three angles:**
 
-roll: garbage. completely unreliable after frame 2000. but doesn't matter much for position.
+roll: not good. completely unreliable after frame 2000. but doesn't matter much for position.
 
 pitch: starts okay, fails later. also doesn't affect horizontal position much.
 
