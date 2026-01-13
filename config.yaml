@@ -8,7 +8,7 @@ vo:
 
 visualization:
   show_video_stream: false   # Show live video stream of left camera
-  show_matches: false        # Show feature matches between frames
-  show_depth_map: false      # Show depth maps during processing
-  show_disparity_map: false  # Show disparity maps during processing
+  show_matches: true        # Show feature matches between frames
+  show_depth_map: true      # Show depth maps during processing
+  show_disparity_map: true  # Show disparity maps during processing
   update_interval: 100      # Show visualizations every N frames

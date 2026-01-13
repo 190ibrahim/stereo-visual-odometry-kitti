@@ -71,6 +71,15 @@ class StereoVisualOdometry:
         trajectory[0] = np.eye(4)  # start at origin
         current_pose = np.eye(4)  # identity matrix = no movement yet
         
+        # open output file for incremental saving
+        # saves results as we go so we don't lose everything if it crashes
+        output_file = f'results/trajectory_{self.sequence}.txt'
+        f = open(output_file, 'w')
+        # write first pose (identity)
+        pose_line = trajectory[0][:3, :].flatten()
+        f.write(' '.join(map(str, pose_line)) + '\n')
+        f.flush()  # make sure it's written to disk
+        
         # Process frames
         for i in range(num_frames - 1):
             # Load images
@@ -116,6 +125,10 @@ class StereoVisualOdometry:
             # just keep previous position if we can't estimate motion
             if len(matches) < 50:
                 trajectory[i+1] = current_pose
+                # save unchanged pose
+                pose_line = current_pose[:3, :].flatten()
+                f.write(' '.join(map(str, pose_line)) + '\n')
+                f.flush()
                 continue
                 
             # estimate how camera moved between frames
@@ -130,6 +143,11 @@ class StereoVisualOdometry:
                 current_pose = current_pose @ np.linalg.inv(T)
                 trajectory[i+1] = current_pose
                 
+                # save this pose to file immediately
+                pose_line = current_pose[:3, :].flatten()
+                f.write(' '.join(map(str, pose_line)) + '\n')
+                f.flush()  # write to disk now, don't wait
+                
                 if i % 50 == 0:
                     print(f'Frame {i}')
                 
@@ -137,7 +155,15 @@ class StereoVisualOdometry:
                 visualizer.update_trajectory(trajectory, i+1)
                     
             except:
+                # if motion estimation fails, keep previous pose
                 trajectory[i+1] = trajectory[i]
+                # save it anyway
+                pose_line = trajectory[i][:3, :].flatten()
+                f.write(' '.join(map(str, pose_line)) + '\n')
+                f.flush()
+        
+        # close the output file
+        f.close()
         
         # Clean up video stream window
         if self.config.get('visualization', {}).get('show_video_stream', True):
@@ -145,12 +171,12 @@ class StereoVisualOdometry:
         
         if plot:
             visualizer.show_final_plot()
+            # save the trajectory plot
+            plot_file = f'results/trajectory_{self.sequence}.png'
+            visualizer.save_plot(plot_file)
         
         print('Processing complete')
-        
-        # Save trajectory in KITTI format
-        output_file = f'results/trajectory_{self.sequence}.txt'
-        self._save_trajectory(trajectory[:num_frames], output_file)
+        print(f'Trajectory saved to: {output_file}')
         
         return trajectory[:num_frames]
     
