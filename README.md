@@ -196,7 +196,7 @@ the red parts at the end show we're 60-90m off from where we should be. if you l
 
 **what this tells us:**
 
-the algorithm doesn't know when it's wrong. errors just pile up silently. no way to self-correct. turns are the killer - every direction change adds error. over 4500 frames with lots of turns, these compound to 90m total drift.
+The algorithm doesn't know when it's wrong. Errors just pile up silently. No way to self-correct. Turns are the killer - every direction change adds error. Over 4500 frames with lots of turns, these compound to 90m total drift.
 
 why it happens:
 - RANSAC can't help if most feature matches are already bad
